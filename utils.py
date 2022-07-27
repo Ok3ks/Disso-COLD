@@ -37,7 +37,7 @@ class RoBERT_Model(nn.Module):
 
     def __init__(self, bertFineTuned, num_classes = 2):
         super(RoBERT_Model, self).__init__()
-        self.bertFineTuned = bertFineTuned
+        self.bertFineTuned = bertFineTuned()
         self.lstm = nn.LSTM(768, 100, num_layers=1, bidirectional=False)
         self.out = nn.Linear(100, num_classes)
 
@@ -86,7 +86,7 @@ class ToBERT_Model(nn.Module):
 
     def __init__(self, bertFineTuned, num_classes = 2):
         super(ToBERT_Model, self).__init__()
-        self.bertFineTuned = bertFineTuned
+        self.bertFineTuned = bertFineTuned()
         self.transformer = nn.Transformer(int = 512, nhead= 8, dropout= 0.1)
         self.out = nn.Linear(100, num_classes)
         
