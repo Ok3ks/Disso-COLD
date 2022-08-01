@@ -26,6 +26,7 @@ import time
 from nltk.tokenize import word_tokenize
 import matplotlib.pyplot as plt
 import torch
+import torch.nn.functional as F
 
 
 #Credits to xx for this part of the code
@@ -42,7 +43,8 @@ class RoBERT_Model(nn.Module):
         super(RoBERT_Model, self).__init__()
         self.bertFineTuned = bertFineTuned()
         self.lstm = nn.LSTM(768, 100, num_layers=1, bidirectional=False)
-        self.out = nn.Linear(100, num_classes)
+        self.out = nn.Softmax(dim= num_classes)
+    
 
     def forward(self, ids, mask, token_type_ids, lengt):
         """ Define how to performed each call
@@ -75,23 +77,24 @@ class RoBERT_Model(nn.Module):
         packed_output, (h_t, h_c) = self.lstm(lstm_input,)  # (h_t, h_c))
 #         output, _ = nn.utils.rnn.pad_packed_sequence(packed_output, padding_value=-91)
 
-        h_t = h_t.view(-1, 100)
-
+        h_t = F.relu(h_t) #
         return self.out(h_t)
 
 
 class ToBERT_Model(nn.Module):
-    """ Make an LSTM model over a fine tuned bert model. Parameters
+    """ Make a transformer over a fine tuned bert model. Parameters
     __________
     bertFineTuned: BertModel
         A bert fine tuned instance
     """
 
-    def __init__(self, bertFineTuned, num_classes = 2):
+    def __init__(self, bertFineTuned, chunks, num_classes = 2):
+
         super(ToBERT_Model, self).__init__()
         self.bertFineTuned = bertFineTuned()
-        self.transformer = nn.Transformer(int = 512, nhead= 8, dropout= 0.1)
-        self.out = nn.Linear(100, num_classes)
+        self.transformer = nn.Transformer(d_model = 512, nhead= 2, dropout= 0.1)
+        self.out = nn.Softmax(dim= num_classes)
+        self.chunks = chunks 
         
 
     def forward(self, ids, mask, token_type_ids, lengt):
@@ -110,24 +113,16 @@ class ToBERT_Model(nn.Module):
         _______
         -
         """
-        _, pooled_out = self.bertFineTuned(ids, attention_mask=mask, token_type_ids=token_type_ids)
-        chunks_emb = pooled_out.split_with_sizes(lengt)
+        self.inp = []; pos_encoding = []
 
-        seq_lengths = torch.LongTensor([x for x in map(len, chunks_emb)])
+        for i,j in enumerate(self.chunks): 
 
-        batch_emb_pad = nn.utils.rnn.pad_sequence(chunks_emb, padding_value=-91, batch_first=True)
+            ids, mask, token_type_ids = i
+            x = self.bertFineTuned(ids, attention_mask=mask, token_type_ids=token_type_ids)
+            self.inp.append(x); pos_encoding.append(j)
 
-        batch_emb = batch_emb_pad.transpose(0, 1)  # (B,L,D) -> (L,B,D)
-        
-        lstm_input = nn.utils.rnn.pack_padded_sequence(
-            batch_emb, seq_lengths.cpu().numpy(), batch_first=False, enforce_sorted=False)
-
-        packed_output, (h_t, h_c) = self.lstm(lstm_input,)  # (h_t, h_c))
-#         output, _ = nn.utils.rnn.pad_packed_sequence(packed_output, padding_value=-91)
-
-        h_t = h_t.view(-1, 100)
-
-        return self.out(h_t)
+        temp_out = self.transformer(x)[:,-1,:]
+        return self.out(temp_out)
 
 #My own code
 
@@ -194,25 +189,39 @@ class AssessData():
 
         plt.show()
 
-    def _chunk(self, words_per_segment):
+    def _chunk(self, words_per_segment, overlap = 50):
         
         """Chunking for input into BERT, length of input 
-        must be less than 512"""
+        must be less than 512 with overlap of 50 tokens"""
+
         self._words_per_segment = words_per_segment
         self._chunks = {}
+        self._overlap = overlap
 
-        for index,length in self._all_length.items():
-            temp = self._content.get(index)
+        if self._get_string_length:
+            for index,length in self._all_length.items():
+                temp = self._content.get(index)
 
-            if length > self._words_per_segment:
+                if length > self._words_per_segment:
 
-                segments = length//self._words_per_segment
-                temp_chunked_content = [temp[:(n*self._words_per_segment)-1] for n in segments]
+                    segments = length + self._overlap//self._words_per_segment
 
-            else: 
-                temp_chunked_content = [temp[:]]
+                    pointer = self._words_per_segment
+                    temp_chunked_content = temp[:pointer]; count = 0
 
-            self._chunks[index] = temp_chunked_content
+                    while count <= segments:
+                        temp_chunked_content.append(temp[pointer - overlap : count*pointer + overlap])
+                        count +=1
+
+                else: 
+                    temp_chunked_content = [temp[:]]
+
+                self._chunks[index] = temp_chunked_content
+        else:
+            self._get_string_length()
+            self._chunk()
+
+        return self._chunks
         
 
 class PrepareCorpus():
