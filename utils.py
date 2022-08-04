@@ -27,7 +27,7 @@ from nltk.tokenize import word_tokenize
 import matplotlib.pyplot as plt
 import torch
 import torch.nn.functional as F
-
+import os
 
 #Credits to xx for this part of the code
 class RoBERT_Model(nn.Module):
@@ -223,6 +223,7 @@ class AssessData():
 
         return self._chunks
         
+
 
 class PrepareCorpus():
 
