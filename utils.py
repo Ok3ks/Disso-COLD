@@ -229,11 +229,11 @@ class PrepareCorpus():
 
     def __init__(self, path):
         self._path = path
-
+        
 
     def _corpus(self):
         """BY date"""
-        self._corpus = {}; temp = []; 
+        self._corpus = {}; temp = []
 
         for topic in os.listdir(self._path):
             subfolder = self._path + '/' + topic
