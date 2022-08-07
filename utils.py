@@ -82,6 +82,7 @@ class RoBERT_Model(nn.Module):
 
 
 class ToBERT_Model(nn.Module):
+    
     """ Make a transformer over a fine tuned bert model. Parameters
     __________
     bertFineTuned: BertModel
@@ -189,49 +190,64 @@ class AssessData():
 
         plt.show()
 
-    def _chunk(self, words_per_segment, overlap = 50):
+    def _chunk(self, words_per_segment, overlap = {"side": "both", "number": 50}):
         
         """Chunking for input into BERT, length of input 
         must be less than 512 with overlap of 50 tokens"""
 
-        self._words_per_segment = words_per_segment
-        self._chunks = {}
+        self._pointer = words_per_segment
+        self._chunks = []
+        self._shift = overlap.get("number")
         self._overlap = overlap
+        
 
-        if self._get_string_length:
-            for index,length in self._all_length.items():
-                temp = self._content.get(index)
+        for index,temp in self._content.items():
+            length = len(temp)
 
-                if length > self._words_per_segment:
+            if length > self._pointer:
 
-                    segments = length + self._overlap//self._words_per_segment
+                content = temp[:self._pointer-1]
+                self._chunks.append((index, content),)
+                count = 1
 
-                    pointer = self._words_per_segment
-                    temp_chunked_content = temp[:pointer]; count = 0
+                while count*self._pointer < length:
 
-                    while count <= segments:
-                        temp_chunked_content.append(temp[pointer - overlap : count*pointer + overlap])
-                        count +=1
+                    if self._overlap.get('side') == "both":
 
-                else: 
-                    temp_chunked_content = [temp[:]]
+                      content = temp[count*self._pointer - self._shift//2 -1: (count+1)*self._pointer + (self._shift - self._shift//2)]
+                      self._chunks.append((index, content),)
+                      count +=1                    
 
-                self._chunks[index] = temp_chunked_content
-        else:
-            self._get_string_length()
-            self._chunk()
+                    elif self._overlap.get('side') == "one":
+                      content = temp[count*self._pointer - self._shift -1: count+1*self._pointer]
+                      self._chunks.append((index, content),)
+
+                      count +=1
+                    else:
+                      print("Choose one or both")
+
+
+                content = temp[count*self._pointer:]
+                self._chunks.append((index, content),)
+
+            else:
+
+                content = [temp[:]]
+                self._chunks.append((index,content),)
 
         return self._chunks
         
 
 
 class PrepareCorpus():
+  """Prepares a corpus from a list of folders 
+  corresponding to class labels"""
 
-    def __init__(self, path):
+  def __init__(self, path):
         self._path = path
         
 
-    def _corpus(self):
+  def _corpus(self):
         """BY date"""
         self._corpus = {}; temp = []
 
@@ -254,4 +270,3 @@ class PrepareCorpus():
 #Chunk strings in a number of segments 
 #Chunk strings with a maximum token length 
 #Visualise Dataset(token length(100, 300, >512), elements per class )
-
