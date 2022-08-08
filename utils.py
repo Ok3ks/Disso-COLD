@@ -128,11 +128,22 @@ class ToBERT_Model(nn.Module):
 #My own code
 
 class AssessData():
-    def __init__(self, listofstrings: list):
+    def __init__(self, dictstringindex: dict, adict:dict):
         #Processes list of strings, 
-        self._content = {i: string for i,string in enumerate(listofstrings)}
+        self._content = dictstringindex
         self._threshold = {'longformer': 4096, 'BERT': 512, "Short" : 300 }
-  
+        self._adict = adict
+
+    def _index_to_label(self):
+
+        index_to_label = {}; index = 0
+
+        for key,alist in self._adict.items():
+          for x in alist:
+            index_to_label[index] = key
+            index += 1
+
+        return index_to_label
 
     def _string_length(self, text):
         """Processes the number of words in one text string """
@@ -247,7 +258,7 @@ class PrepareCorpus():
         self._path = path
         
 
-  def _corpus(self):
+  def _prep(self):
         """BY date"""
         self._corpus = {}; temp = []
 
